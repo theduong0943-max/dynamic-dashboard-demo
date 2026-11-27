@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Demo Dynamic Dashboard — Config-Driven</title>
+  <style>
+    :root {
+      --bg-page: #f4f6f9;
+      --bg-card: #ffffff;
+      --bg-subtle: #eef2f6;
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --border: #cbd5e1;
+      --primary: #1d4ed8;
+      --primary-hover: #1e40af;
+      --accent-green: #15803d;
+      --accent-red: #b91c1c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg-page);
+      color: var(--text-main);
+      line-height: 1.5;
+    }
+
+    .topbar {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .topbar h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    select, button {
+      font: inherit;
+      padding: 7px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-main);
+      cursor: pointer;
+    }
+
+    button.primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    button.primary:hover {
+      background: var(--primary-hover);
+    }
+
+    button.active-edit {
+      background: #fef3c7;
+      border-color: #d97706;
+      color: #78350f;
+      font-weight: 600;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 20px auto;
+      padding: 0 20px 32px;
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 20px;
+    }
+
+    @media (max-width: 960px) {
+      .container { grid-template-columns: 1fr; }
+    }
+
+    .grid-canvas {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .widget-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    }
+
+    .widget-card[draggable="true"] {
+      cursor: grab;
+      border-style: dashed;
+      border-color: var(--primary);
+    }
+
+    .widget-card.drag-over {
+      outline: 2px solid var(--primary);
+      background: #eff6ff;
+    }
+
+    .widget-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--bg-subtle);
+    }
+
+    .widget-title {
+      font-weight: 700;
+      font-size: 15px;
+      margin: 0;
+    }
+
+    .widget-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .widget-actions button {
+      padding: 3px 8px;
+      font-size: 12px;
+    }
+
+    .kpi-value {
+      font-size: 28px;
+      font-weight: 800;
+      margin: 4px 0;
+    }
+
+    .kpi-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 90px 1fr 85px;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+
+    .bar-track {
+      height: 18px;
+      background: var(--bg-subtle);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: var(--primary);
+      border-radius: 999px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--bg-subtle);
+    }
+
+    th {
+      background: var(--bg-subtle);
+      color: var(--text-main);
+      font-weight: 700;
+    }
+
+    .tag-income { color: var(--accent-green); font-weight: 700; }
+    .tag-expense { color: var(--accent-red); font-weight: 700; }
+
+    .config-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      height: fit-content;
+    }
+
+    .config-panel h2 {
+      margin: 0 0 12px;
+      font-size: 16px;
+    }
+
+    .widget-toggle-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--bg-subtle);
+      font-size: 14px;
+    }
+
+    pre.json-preview {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 11.5px;
+      max-height: 260px;
+      overflow: auto;
+      margin: 10px 0 0;
+      color: var(--text-main);
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <h1>Dynamic Dashboard Demo (Config-Driven)</h1>
+    <div class="controls">
+      <label>
+        Kỳ dữ liệu:
+        <select id="periodFilter">
+          <option value="7d">7 ngày gần nhất</option>
+          <option value="30d" selected>30 ngày gần nhất</option>
+        </select>
+      </label>
+      <label>
+        Danh mục:
+        <select id="categoryFilter">
+          <option value="ALL">Tất cả</option>
+          <option value="Operations">Vận hành</option>
+          <option value="Sales">Doanh thu bán hàng</option>
+          <option value="Tools">Công cụ & dịch vụ</option>
+        </select>
+      </label>
+      <button id="toggleEditBtn">Bật chế độ kéo/đổi size</button>
+      <button id="addWidgetBtn" class="primary">+ Thêm widget KPI</button>
+      <button id="resetConfigBtn">Reset config</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="dashboardGrid" class="grid-canvas"></section>
+
+    <aside class="config-panel">
+      <h2>Quản lý Widget & Config JSON</h2>
+      <div id="widgetToggles"></div>
+      <div style="margin-top: 14px; font-size: 13px; font-weight: 700;">
+        Live Config State (JSON):
+      </div>
+      <pre id="configJsonView" class="json-preview"></pre>
+    </aside>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "dynamic_dashboard_demo_config_v1";
+
+    const RAW_TRANSACTIONS = [
+      { id: "TX-101", title: "Thanh toán đơn hàng #101", category: "Sales", type: "income", amount: 18500000, period: "7d" },
+      { id: "TX-102", title: "Gia hạn server & hosting", category: "Operations", type: "expense", amount: 3200000, period: "7d" },
+      { id: "TX-103", title: "Gói license công cụ dev", category: "Tools", type: "expense", amount: 1450000, period: "7d" },
+      { id: "TX-104", title: "Doanh thu gói dịch vụ tháng", category: "Sales", type: "income", amount: 24000000, period: "30d" },
+      { id: "TX-105", title: "Chi phí vận hành văn phòng", category: "Operations", type: "expense", amount: 6800000, period: "30d" },
+      { id: "TX-106", title: "Cập nhật module báo cáo", category: "Tools", type: "expense", amount: 2100000, period: "30d" }
+    ];
+
+    const DEFAULT_CONFIG = {
+      filters: { period: "30d", category: "ALL" },
+      editMode: false,
+      widgets: [
+        { id: "w-net", type: "kpi", title: "Số dư ròng", metric: "net", colSpan: 6, visible: true },
+        { id: "w-income", type: "kpi", title: "Tổng thu", metric: "income", colSpan: 6, visible: true },
+        { id: "w-bar", type: "bar_chart", title: "Phân bổ giá trị theo danh mục", colSpan: 7, visible: true },
+        { id: "w-table", type: "table", title: "Danh sách giao dịch gần đây", colSpan: 5, visible: true }
+      ]
+    };
+
+    let state = loadConfig();
+    let draggedWidgetId = null;
+
+    function loadConfig() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        return saved ? { ...DEFAULT_CONFIG, ...JSON.parse(saved) } : structuredClone(DEFAULT_CONFIG);
+      } catch {
+        return structuredClone(DEFAULT_CONFIG);
+      }
+    }
+
+    function saveConfig() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function formatVND(num) {
+      return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(num);
+    }
+
+    function getFilteredData() {
+      return RAW_TRANSACTIONS.filter((item) => {
+        const matchPeriod = state.filters.period === "30d" ? true : item.period === "7d";
+        const matchCategory = state.filters.category === "ALL" ? true : item.category === state.filters.category;
+        return matchPeriod && matchCategory;
+      });
+    }
+
+    function computeMetrics(rows) {
+      const income = rows.filter((r) => r.type === "income").reduce((s, r) => s + r.amount, 0);
+      const expense = rows.filter((r) => r.type === "expense").reduce((s, r) => s + r.amount, 0);
+      return { income, expense, net: income - expense, count: rows.length };
+    }
+
+    const WIDGET_RENDERERS = {
+      kpi(widget, rows) {
+        const m = computeMetrics(rows);
+        const valueMap = {
+          net: m.net,
+          income: m.income,
+          expense: m.expense,
+          count: m.count
+        };
+        const rawVal = valueMap[widget.metric] ?? m.net;
+        const formatted = widget.metric === "count" ? `${rawVal} bản ghi` : formatVND(rawVal);
+
+        return `
+          <div class="kpi-value">${formatted}</div>
+          <div class="kpi-sub">Dựa trên ${rows.length} giao dịch khớp bộ lọc hiện tại</div>
+        `;
+      },
+
+      bar_chart(widget, rows) {
+        const categories = ["Sales", "Operations", "Tools"];
+        const totals = categories.map((cat) => ({
+          cat,
+          sum: rows.filter((r) => r.category === cat).reduce((s, r) => s + r.amount, 0)
+        }));
+        const maxVal = Math.max(...totals.map((t) => t.sum), 1);
+
+        return totals
+          .map((t) => {
+            const pct = Math.round((t.sum / maxVal) * 100);
+            return `
+              <div class="bar-row">
+                <strong>${t.cat}</strong>
+                <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+                <span style="text-align:right">${formatVND(t.sum)}</span>
+              </div>
+            `;
+          })
+          .join("");
+      },
+
+      table(widget, rows) {
+        if (!rows.length) return `<div class="kpi-sub">Không có dữ liệu phù hợp bộ lọc.</div>`;
+        const bodyRows = rows
+          .map(
+            (r) => `
+            <tr>
+              <td>${r.id}</td>
+              <td>${r.title}</td>
+              <td class="${r.type === "income" ? "tag-income" : "tag-expense"}">
+                ${r.type === "income" ? "+" : "-"}${formatVND(r.amount)}
+              </td>
+            </tr>
+          `
+          )
+          .join("");
+
+        return `
+          <table>
+            <thead>
+              <tr><th>Mã</th><th>Nội dung</th><th>Giá trị</th></tr>
+            </thead>
+            <tbody>${bodyRows}</tbody>
+          </table>
+        `;
+      }
+    };
+
+    function render() {
+      saveConfig();
+      document.getElementById("periodFilter").value = state.filters.period;
+      document.getElementById("categoryFilter").value = state.filters.category;
+
+      const editBtn = document.getElementById("toggleEditBtn");
+      editBtn.textContent = state.editMode ? "Đang bật kéo/đổi size" : "Bật chế độ kéo/đổi size";
+      editBtn.className = state.editMode ? "active-edit" : "";
+
+      const rows = getFilteredData();
+      const gridEl = document.getElementById("dashboardGrid");
+      gridEl.innerHTML = "";
+
+      state.widgets
+        .filter((w) => w.visible)
+        .forEach((widget) => {
+          const card = document.createElement("article");
+          card.className = "widget-card";
+          card.style.gridColumn = `span ${widget.colSpan}`;
+          card.draggable = state.editMode;
+
+          card.addEventListener("dragstart", () => {
+            draggedWidgetId = widget.id;
+          });
+
+          card.addEventListener("dragover", (e) => {
+            if (!state.editMode) return;
+            e.preventDefault();
+            card.classList.add("drag-over");
+          });
+
+          card.addEventListener("dragleave", () => {
+            card.classList.remove("drag-over");
+          });
+
+          card.addEventListener("drop", (e) => {
+            e.preventDefault();
+            card.classList.remove("drag-over");
+            if (!state.editMode || !draggedWidgetId || draggedWidgetId === widget.id) return;
+
+            const fromIdx = state.widgets.findIndex((x) => x.id === draggedWidgetId);
+            const toIdx = state.widgets.findIndex((x) => x.id === widget.id);
+            const [moved] = state.widgets.splice(fromIdx, 1);
+            state.widgets.splice(toIdx, 0, moved);
+            draggedWidgetId = null;
+            render();
+          });
+
+          const nextSpan = widget.colSpan === 12 ? 6 : widget.colSpan === 6 ? 4 : 12;
+          const bodyHtml = WIDGET_RENDERERS[widget.type]
+            ? WIDGET_RENDERERS[widget.type](widget, rows)
+            : `<div>Loại widget chưa hỗ trợ: ${widget.type}</div>`;
+
+          card.innerHTML = `
+            <div class="widget-header">
+              <h3 class="widget-title">${widget.title}</h3>
+              <div class="widget-actions">
+                <button data-action="resize" data-id="${widget.id}" data-span="${nextSpan}" title="Đổi độ rộng cột">
+                  ${widget.colSpan}/12 col
+                </button>
+                <button data-action="hide" data-id="${widget.id}" title="Ẩn widget">Ẩn</button>
+              </div>
+            </div>
+            ${bodyHtml}
+          `;
+
+          gridEl.appendChild(card);
+        });
+
+      const togglesEl = document.getElementById("widgetToggles");
+      togglesEl.innerHTML = state.widgets
+        .map(
+          (w) => `
+          <label class="widget-toggle-item">
+            <span>${w.title}</span>
+            <input type="checkbox" data-toggle-id="${w.id}" ${w.visible ? "checked" : ""} />
+          </label>
+        `
+        )
+        .join("");
+
+      document.getElementById("configJsonView").textContent = JSON.stringify(state, null, 2);
+    }
+
+    document.getElementById("periodFilter").addEventListener("change", (e) => {
+      state.filters.period = e.target.value;
+      render();
+    });
+
+    document.getElementById("categoryFilter").addEventListener("change", (e) => {
+      state.filters.category = e.target.value;
+      render();
+    });
+
+    document.getElementById("toggleEditBtn").addEventListener("click", () => {
+      state.editMode = !state.editMode;
+      render();
+    });
+
+    document.getElementById("addWidgetBtn").addEventListener("click", () => {
+      const idx = state.widgets.length + 1;
+      state.widgets.push({
+        id: `w-kpi-${Date.now()}`,
+        type: "kpi",
+        title: `Tổng chi #${idx}`,
+        metric: "expense",
+        colSpan: 6,
+        visible: true
+      });
+      render();
+    });
+
+    document.getElementById("resetConfigBtn").addEventListener("click", () => {
+      localStorage.removeItem(STORAGE_KEY);
+      state = structuredClone(DEFAULT_CONFIG);
+      render();
+    });
+
+    document.getElementById("dashboardGrid").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-action]");
+      if (!btn) return;
+      const { action, id, span } = btn.dataset;
+      const target = state.widgets.find((w) => w.id === id);
+      if (!target) return;
+
+      if (action === "resize") {
+        target.colSpan = Number(span);
+      } else if (action === "hide") {
+        target.visible = false;
+      }
+      render();
+    });
+
+    document.getElementById("widgetToggles").addEventListener("change", (e) => {
+      const id = e.target.dataset.toggleId;
+      if (!id) return;
+      const target = state.widgets.find((w) => w.id === id);
+      if (target) {
+        target.visible = e.target.checked;
+        render();
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>
